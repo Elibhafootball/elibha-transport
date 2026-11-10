@@ -5,14 +5,13 @@ export class JourneyEngine {
     this.names=new Map(stations.map(s=>[s.code,s.name]));
     this.byStation=new Map();this.walk=new Map();this.departures=new Map();
     for(const [a,b,t] of data.transfers){if(!this.walk.has(a))this.walk.set(a,[]);this.walk.get(a).push({to:b,time:t})}
+    // Index one boarding event per train/flight/ferry stop, rather than every
+    // possible origin-destination pair (which was nearly 900,000 edges).
     for(const service of this.services){
       for(let i=0;i<service.stops.length-1;i++){
         const [from,depart]=service.stops[i];
         if(!this.byStation.has(from))this.byStation.set(from,[]);
-        for(let j=i+1;j<service.stops.length;j++){
-          const [to,arrive]=service.stops[j];
-          this.byStation.get(from).push({service,from,to,depart,arrive,fromIndex:i,toIndex:j});
-        }
+        this.byStation.get(from).push({service,from,depart,fromIndex:i});
       }
     }
     for(const [code,edges] of this.byStation) {
@@ -63,18 +62,19 @@ export class JourneyEngine {
       for(let idx=left;idx<edges.length&&edges[idx].depart<=hi;idx++){
         const edge=edges[idx];
         if(current.path.some(p=>p.type==='ride'&&p.service.id===edge.service.id))continue;
-        if(current.path.some(p=>p.from===edge.to))continue;
         if(edge.service.mode==='flight'&&!includeFlights)continue;
-        // Repeat the daily timetable across the relevant day boundaries.
         const buffer=current.mode==='start'?0:current.walked?0:this.connectionTime(current.mode,edge.service.mode,true);
         const ready=current.time+buffer;
-        const offset=day;
-        const depart=edge.depart+offset*1440;
+        const depart=edge.depart+day*1440;
         if(depart<ready||depart-current.time>240||depart-earliest>900)continue;
-        const arrive=edge.arrive+offset*1440;
-        if(best&&arrive>=best.time)continue;
-        const step={type:'ride',service:edge.service,from:edge.from,to:edge.to,depart,arrive,fromIndex:edge.fromIndex,toIndex:edge.toIndex};
-        add({at:edge.to,time:arrive,mode:edge.service.mode,legs:current.legs+1,walked:false,path:[...current.path,step],first:current.first??depart});
+        for(let j=edge.fromIndex+1;j<edge.service.stops.length;j++){
+          const [toCode,toTime]=edge.service.stops[j];
+          if(current.path.some(p=>p.from===toCode))continue;
+          const arrive=toTime+day*1440;
+          if(best&&arrive>=best.time)continue;
+          const step={type:'ride',service:edge.service,from:edge.from,to:toCode,depart,arrive,fromIndex:edge.fromIndex,toIndex:j};
+          add({at:toCode,time:arrive,mode:edge.service.mode,legs:current.legs+1,walked:false,path:[...current.path,step],first:current.first??depart});
+        }
       }}
     }
     return best?{depart:best.first??earliest,arrive:best.time,steps:best.path,rides:best.legs}:null;
