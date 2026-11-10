@@ -102,13 +102,23 @@ export class JourneyEngine {
       for(let day=0;day<=2;day++){const dep=s.stops[a][1]+1440*day;if(dep<start||dep>start+900)continue;const sig=s.id;if(keys.has(sig))continue;keys.add(sig);results.push({depart:dep,arrive:s.stops[b][1]+1440*day,rides:1,steps:[{type:'ride',service:s,from,to,depart:dep,arrive:s.stops[b][1]+1440*day,fromIndex:a,toIndex:b}]})}
     }
     results.sort((a,b)=>a.depart-b.depart||a.arrive-b.arrive||a.rides-b.rides);
-    // Hide strictly inferior itineraries that depart at the same time and arrive later
-    // with more changes, but retain direct services as passenger choices.
-    const chosen=[];
-    for(const r of results){const rides=r.steps.filter(x=>x.type==='ride');if(!rides.length)continue;
-      if(chosen.some(x=>x.depart===r.depart&&x.arrive<=r.arrive&&x.rides<=r.rides))continue;
-      chosen.push(r);
+    // A later departure that arrives no later, with no more changes,
+    // makes the earlier itinerary pointless. Apply this across the whole
+    // candidate set, not just journeys departing at identical times.
+    // A direct train remains useful when its alternative involves changes.
+    const chosen=results.filter((r,i)=>r.steps.some(x=>x.type==='ride')&&!results.some((other,j)=>
+      i!==j&&other.depart>=r.depart&&other.arrive<=r.arrive&&other.rides<=r.rides&&
+      (other.depart>r.depart||other.arrive<r.arrive||other.rides<r.rides)
+    ));
+    // Where two distinct services have identical times and change counts,
+    // show just one unless their modes differ.
+    const unique=[];
+    for(const r of chosen){
+      const mode=r.steps.filter(x=>x.type==='ride').map(x=>x.service.mode).join('|');
+      if(unique.some(x=>x.depart===r.depart&&x.arrive===r.arrive&&x.rides===r.rides&&
+        x.steps.filter(y=>y.type==='ride').map(y=>y.service.mode).join('|')===mode))continue;
+      unique.push(r);
     }
-    return chosen.slice(0,limit);
+    return unique.slice(0,limit);
   }
 }
