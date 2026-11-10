@@ -36,34 +36,46 @@ export class JourneyEngine {
   // Earliest-arrival, bounded-transfer time-dependent label search.
   route(from,to,earliest,includeFlights,maxLegs=8){
     const labels=new Map(),queue=[];let seq=0;
-    const add=l=>{const key=l.at+'|'+l.mode+'|'+l.legs+'|'+(l.walked?'w':'n');const old=labels.get(key);if(old&&old.time<=l.time)return;labels.set(key,l);queue.push({...l,key,seq:seq++})};
+    const push=x=>{queue.push(x);let i=queue.length-1;while(i){let p=(i-1)>>1;if(queue[p].time<=x.time)break;queue[i]=queue[p];i=p}queue[i]=x};
+    const pop=()=>{const out=queue[0],last=queue.pop();if(queue.length){let i=0;while(i*2+1<queue.length){let c=i*2+1;if(c+1<queue.length&&queue[c+1].time<queue[c].time)c++;if(last.time<=queue[c].time)break;queue[i]=queue[c];i=c}queue[i]=last}return out};
+    const add=l=>{const key=l.at+'|'+l.mode+'|'+l.legs+'|'+(l.walked?'w':'n');const old=labels.get(key);if(old&&old.time<=l.time)return;labels.set(key,l);push({...l,key,seq:seq++})};
     add({at:from,time:earliest,mode:'start',legs:0,walked:false,path:[],first:null});
     let best=null,iterations=0;
     while(queue.length&&iterations++<25000){
-      queue.sort((a,b)=>b.time-a.time);const current=queue.pop();
+      const current=pop();
       if(labels.get(current.key)?.time!==current.time)continue;
       if(best&&current.time>=best.time)continue;
       if(current.at===to&&current.path.length){best=current;continue}
       if(current.time-earliest>1800)continue;
       for(const w of this.walk.get(current.at)||[]){
+        if(current.path.some(p=>p.from===w.to||p.to===w.to))continue;
         const mins=this.walkTime(current.at,w.to,w.time,current.mode);
         add({...current,at:w.to,time:current.time+mins,walked:true,path:[...current.path,{type:'walk',from:current.at,to:w.to,depart:current.time,arrive:current.time+mins}]});
       }
       if(current.legs>=maxLegs)continue;
       const edges=this.byStation.get(current.at)||[];
-      for(const edge of edges){
+      // Timetables repeat daily: inspect only departures in the next four hours.
+      for(let day=Math.floor(current.time/1440)-1;day<=Math.floor(current.time/1440)+1;day++){
+      const readyFloor=current.time+(current.mode==='start'||current.walked?0:2);
+      const lo=readyFloor-day*1440-60,hi=current.time+240-day*1440;
+      let left=0,right=edges.length;
+      while(left<right){const mid=(left+right)>>1;if(edges[mid].depart<lo)left=mid+1;else right=mid}
+      for(let idx=left;idx<edges.length&&edges[idx].depart<=hi;idx++){
+        const edge=edges[idx];
+        if(current.path.some(p=>p.type==='ride'&&p.service.id===edge.service.id))continue;
+        if(current.path.some(p=>p.from===edge.to))continue;
         if(edge.service.mode==='flight'&&!includeFlights)continue;
         // Repeat the daily timetable across the relevant day boundaries.
         const buffer=current.mode==='start'?0:current.walked?0:this.connectionTime(current.mode,edge.service.mode,true);
         const ready=current.time+buffer;
-        const offset=Math.ceil((ready-edge.depart)/1440);
+        const offset=day;
         const depart=edge.depart+offset*1440;
         if(depart<ready||depart-current.time>240||depart-earliest>900)continue;
         const arrive=edge.arrive+offset*1440;
         if(best&&arrive>=best.time)continue;
         const step={type:'ride',service:edge.service,from:edge.from,to:edge.to,depart,arrive,fromIndex:edge.fromIndex,toIndex:edge.toIndex};
         add({at:edge.to,time:arrive,mode:edge.service.mode,legs:current.legs+1,walked:false,path:[...current.path,step],first:current.first??depart});
-      }
+      }}
     }
     return best?{depart:best.first??earliest,arrive:best.time,steps:best.path,rides:best.legs}:null;
   }
@@ -74,7 +86,7 @@ export class JourneyEngine {
     for(const code of seen)for(const d of this.departures.get(code)||[])for(let day=0;day<=2;day++){const at=d+day*1440;if(at>=start&&at<start+900)seeds.add(at)}
     const ordered=[...seeds].sort((a,b)=>a-b);const results=[],keys=new Set();
     // Group near-identical results by the actual boarded services and arrival.
-    for(const seed of ordered.slice(0,55)){
+    for(const seed of ordered.slice(0,14)){
       const r=this.route(from,to,seed,includeFlights);
       if(!r)continue;
       const signature=r.steps.filter(s=>s.type==='ride').map(s=>s.service.id).join('|');
