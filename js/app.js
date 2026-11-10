@@ -12,7 +12,7 @@ function setup(which){
  function show(forceAll=false){
    const q=norm(input.value.trim());
    selected[which]=null;active=-1;list.replaceChildren();
-   hits=forceAll||!q?stations:stations.filter(s=>norm(s.name).includes(q));
+   hits=forceAll||!q?stations:stations.filter(s=>norm(s.name).startsWith(q));
    if(q&&!forceAll)hits.sort((a,b)=>Number(norm(b.name).startsWith(q))-Number(norm(a.name).startsWith(q))||a.name.localeCompare(b.name));
    const visible=forceAll||!q?hits:hits.slice(0,35);
    for(const item of visible){const b=element('button',null,item.name);b.type='button';b.setAttribute('role','option');const small=element('small',null,item.code);b.appendChild(small);b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>choose(item));list.appendChild(b)}
