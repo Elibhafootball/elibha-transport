@@ -41,7 +41,7 @@ export class JourneyEngine {
     const add=l=>{const key=l.at+'|'+l.mode+'|'+l.legs+'|'+(l.walked?'w':'n');const old=labels.get(key);if(old&&old.time<=l.time)return;labels.set(key,l);push({...l,key,seq:seq++})};
     add({at:from,time:earliest,mode:'start',legs:0,walked:false,path:[],first:null});
     let best=null,iterations=0;
-    while(queue.length&&iterations++<25000){
+    while(queue.length&&iterations++<10000){
       const current=pop();
       if(labels.get(current.key)?.time!==current.time)continue;
       if(best&&current.time>=best.time)continue;
@@ -86,7 +86,7 @@ export class JourneyEngine {
     for(const code of seen)for(const d of this.departures.get(code)||[])for(let day=0;day<=2;day++){const at=d+day*1440;if(at>=start&&at<start+900)seeds.add(at)}
     const ordered=[...seeds].sort((a,b)=>a-b);const results=[],keys=new Set();
     // Group near-identical results by the actual boarded services and arrival.
-    for(const seed of ordered.slice(0,14)){
+    for(const seed of ordered.filter((t,i,a)=>i===0||t-a[i-1]>=5).slice(0,10)){
       const r=this.route(from,to,seed,includeFlights);
       if(!r)continue;
       const signature=r.steps.filter(s=>s.type==='ride').map(s=>s.service.id).join('|');
@@ -101,7 +101,7 @@ export class JourneyEngine {
       if(a<0||b<0)continue;
       for(let day=0;day<=2;day++){const dep=s.stops[a][1]+1440*day;if(dep<start||dep>start+900)continue;const sig=s.id;if(keys.has(sig))continue;keys.add(sig);results.push({depart:dep,arrive:s.stops[b][1]+1440*day,rides:1,steps:[{type:'ride',service:s,from,to,depart:dep,arrive:s.stops[b][1]+1440*day,fromIndex:a,toIndex:b}]})}
     }
-    results.sort((a,b)=>a.depart-b.depart||a.arrive-b.arrive);
+    results.sort((a,b)=>a.depart-b.depart||a.arrive-b.arrive||a.rides-b.rides);
     // Hide strictly inferior itineraries that depart at the same time and arrive later
     // with more changes, but retain direct services as passenger choices.
     const chosen=[];
