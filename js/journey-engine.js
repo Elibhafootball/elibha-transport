@@ -61,7 +61,7 @@ export class JourneyEngine {
       while(left<right){const mid=(left+right)>>1;if(edges[mid].depart<lo)left=mid+1;else right=mid}
       for(let idx=left;idx<edges.length&&edges[idx].depart<=hi;idx++){
         const edge=edges[idx];
-        if(current.path.some(p=>p.type==='ride'&&(p.service.id===edge.service.id||p.service.code===edge.service.code)))continue;
+        if(current.path.some(p=>p.type==='ride'&&p.service.id===edge.service.id))continue;
         if(edge.service.mode==='flight'&&!includeFlights)continue;
         const buffer=current.mode==='start'?0:current.walked?0:this.connectionTime(current.mode,edge.service.mode,true);
         const ready=current.time+buffer;
@@ -69,7 +69,7 @@ export class JourneyEngine {
         if(depart<ready||depart-current.time>240||depart-earliest>900)continue;
         for(let j=edge.fromIndex+1;j<edge.service.stops.length;j++){
           const [toCode,toTime]=edge.service.stops[j];
-          if(current.path.some(p=>p.from===toCode))continue;
+          if(current.path.some(p=>p.from===toCode||p.to===toCode))continue;
           const arrive=toTime+day*1440;
           if(best&&arrive>best.time)continue;
           const step={type:'ride',service:edge.service,from:edge.from,to:toCode,depart,arrive,fromIndex:edge.fromIndex,toIndex:j};
