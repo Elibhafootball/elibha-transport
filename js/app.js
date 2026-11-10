@@ -1,4 +1,4 @@
-import {JourneyEngine} from './journey-engine.js?v=20261110-4';
+import {JourneyEngine} from './journey-engine.js?v=20261110-5';
 let stations=[],engine=null,base=600,windowStart=600,history=[],lastResults=[],searchSerial=0;const selected={from:null,to:null};
 const $=id=>document.getElementById(id),norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const fmt=t=>String(Math.floor(t/60)%24).padStart(2,'0')+':'+String(t%60).padStart(2,'0')+(t>=1440?' +'+Math.floor(t/1440)+'d':'');
