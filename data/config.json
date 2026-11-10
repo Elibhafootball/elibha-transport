@@ -1,0 +1,10 @@
+{
+  "minChangeMinutes": 2,
+  "flightConnections": {
+    "toFlightMinutes": 60,
+    "fromFlightMinutes": 30
+  },
+  "flightsEnabledByDefault": false,
+  "initialResults": 10,
+  "sourceSpreadsheetId": "1e-DO5msOmZ_-A5eH1gNI866SehFHQEfdZLZuxV2fr0k"
+}
