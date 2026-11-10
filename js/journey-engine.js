@@ -43,8 +43,8 @@ export class JourneyEngine {
     while(queue.length&&iterations++<10000){
       const current=pop();
       if(labels.get(current.key)?.time!==current.time)continue;
-      if(best&&current.time>=best.time)continue;
-      if(current.at===to&&current.path.length){best=current;continue}
+      if(best&&current.time>best.time)continue;
+      if(current.at===to&&current.path.length){if(!best||current.time<best.time||(current.time===best.time&&current.legs<best.legs))best=current;continue}
       if(current.time-earliest>1800)continue;
       for(const w of this.walk.get(current.at)||[]){
         if(current.path.some(p=>p.from===w.to||p.to===w.to))continue;
@@ -61,7 +61,7 @@ export class JourneyEngine {
       while(left<right){const mid=(left+right)>>1;if(edges[mid].depart<lo)left=mid+1;else right=mid}
       for(let idx=left;idx<edges.length&&edges[idx].depart<=hi;idx++){
         const edge=edges[idx];
-        if(current.path.some(p=>p.type==='ride'&&p.service.id===edge.service.id))continue;
+        if(current.path.some(p=>p.type==='ride'&&(p.service.id===edge.service.id||p.service.code===edge.service.code)))continue;
         if(edge.service.mode==='flight'&&!includeFlights)continue;
         const buffer=current.mode==='start'?0:current.walked?0:this.connectionTime(current.mode,edge.service.mode,true);
         const ready=current.time+buffer;
@@ -71,7 +71,7 @@ export class JourneyEngine {
           const [toCode,toTime]=edge.service.stops[j];
           if(current.path.some(p=>p.from===toCode))continue;
           const arrive=toTime+day*1440;
-          if(best&&arrive>=best.time)continue;
+          if(best&&arrive>best.time)continue;
           const step={type:'ride',service:edge.service,from:edge.from,to:toCode,depart,arrive,fromIndex:edge.fromIndex,toIndex:j};
           add({at:toCode,time:arrive,mode:edge.service.mode,legs:current.legs+1,walked:false,path:[...current.path,step],first:current.first??depart});
         }
