@@ -10,8 +10,49 @@ function setup(which){const input=$(which),list=$(which+'-list');function close(
  input.addEventListener('input',show);input.addEventListener('focus',show);input.addEventListener('keydown',e=>{if(e.key==='Escape')close();if(e.key==='Enter'&&!list.hidden){e.preventDefault();list.querySelector('button')?.click()}});document.addEventListener('click',e=>{if(!input.parentElement.contains(e.target))close()})}
 function nav(){const div=element('div','nav');for(const [label,delta] of [['← Earlier',-1],['Later →',1]]){const b=element('button',null,label);b.disabled=delta<0&&history.length===0;b.addEventListener('click',()=>{if(delta<0){windowStart=history.pop()??base}else{history.push(windowStart);windowStart=lastResults.length?Math.max(windowStart+1,lastResults[lastResults.length-1].depart+1):windowStart+180}render()});div.appendChild(b)}return div}
 function showStops(step){const details=element('details');const summary=element('summary',null,'Show all stops and times');details.appendChild(summary);const ul=element('ul','stops');const dayOffset=Math.floor((step.depart-step.service.stops[step.fromIndex][1])/1440)*1440;for(const [code,time] of step.service.stops.slice(step.fromIndex,step.toIndex+1)){const li=element('li');li.appendChild(element('strong',null,fmt(time+dayOffset)));li.appendChild(element('span',null,engine.names.get(code)||code));ul.appendChild(li)}details.appendChild(ul);return details}
-function resultCard(r){const d=element('details','journey'),s=element('summary'),top=element('div','journey-top');top.appendChild(element('span','times',fmt(r.depart)+' → '+fmt(r.arrive)));top.appendChild(element('span','tag',r.rides===1?'Direct':(r.rides-1)+' change'+(r.rides===2?'':'s')));s.appendChild(top);s.appendChild(element('div','subtle',Math.floor((r.arrive-r.depart)/60)+'h '+String((r.arrive-r.depart)%60).padStart(2,'0')+'m · '+r.steps.filter(x=>x.type==='ride').map(x=>x.service.code).join(' → ')));d.appendChild(s);
- for(const step of r.steps){const leg=element('div','leg');if(step.type==='walk'){leg.appendChild(element('div',null,fmt(step.depart)+'–'+fmt(step.arrive)+' · Transfer: '+engine.names.get(step.from)+' → '+engine.names.get(step.to)));}else{leg.appendChild(element('strong',null,fmt(step.depart)+' '+engine.names.get(step.from)+' → '+fmt(step.arrive)+' '+engine.names.get(step.to)));leg.appendChild(element('div','subtle',step.service.code+' · '+step.service.name+' · '+step.service.mode));leg.appendChild(showStops(step))}d.appendChild(leg)}return d}
+const modeIcon={train:'🚆',metro:'🚇',ferry:'⛴️',flight:'✈️'};
+const modeLabel={train:'Train',metro:'Underground',ferry:'Ferry',flight:'Flight'};
+function place(code){return engine.names.get(code)||code}
+function resultCard(r){
+ const d=element('details','journey'),summary=element('summary','journey-summary');
+ const rides=r.steps.filter(x=>x.type==='ride');
+ const top=element('div','journey-top'),route=element('div','route-heading');
+ const origin=element('div','endpoint');origin.appendChild(element('strong','times',fmt(r.depart)));origin.appendChild(element('span','station-name',place(r.steps[0].from)));
+ const arrow=element('span','route-arrow','→');
+ const destination=element('div','endpoint');destination.appendChild(element('strong','times',fmt(r.arrive)));destination.appendChild(element('span','station-name',place(r.steps[r.steps.length-1].to)));
+ route.append(origin,arrow,destination);top.append(route,element('span','tag',r.rides===1?'Direct':(r.rides-1)+' change'+(r.rides===2?'':'s')));
+ summary.appendChild(top);
+ const detail=element('div','journey-overview');
+ detail.appendChild(element('span','duration',Math.floor((r.arrive-r.depart)/60)+'h '+String((r.arrive-r.depart)%60).padStart(2,'0')+'m'));
+ const itinerary=element('div','itinerary');
+ for(let i=0;i<rides.length;i++){
+   const leg=rides[i],mode=element('span','mode-chip mode-'+leg.service.mode,modeIcon[leg.service.mode]||'•');
+   mode.title=modeLabel[leg.service.mode]||leg.service.mode;
+   mode.setAttribute('aria-label',mode.title);itinerary.appendChild(mode);
+   if(i<rides.length-1){
+     const transfer=element('span','change-place',place(leg.to));
+     itinerary.appendChild(transfer);
+     itinerary.appendChild(element('span','change-arrow','›'));
+   }
+ }
+ detail.appendChild(itinerary);summary.appendChild(detail);d.appendChild(summary);
+ const body=element('div','journey-body');
+ for(const step of r.steps){
+   const leg=element('div','leg');
+   if(step.type==='walk'){
+     leg.appendChild(element('div','walk-leg','🚶 '+fmt(step.depart)+'–'+fmt(step.arrive)+' · Walk from '+place(step.from)+' to '+place(step.to)));
+   }else{
+     const heading=element('div','leg-heading');
+     heading.appendChild(element('span','leg-mode',modeIcon[step.service.mode]||'•'));
+     heading.appendChild(element('strong',null,fmt(step.depart)+' '+place(step.from)+' → '+fmt(step.arrive)+' '+place(step.to)));
+     leg.appendChild(heading);
+     leg.appendChild(element('div','subtle',modeLabel[step.service.mode]+' '+step.service.code+' · '+step.service.name));
+     leg.appendChild(showStops(step));
+   }
+   body.appendChild(leg);
+ }
+ d.appendChild(body);return d;
+}
 async function render(){const serial=++searchSerial;const out=$('results');out.replaceChildren();if(!engine||!selected.from||!selected.to)return;
  $('status').textContent='Searching timetables…';await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));if(serial!==searchSerial)return;const start=windowStart;const results=engine.journeys(selected.from.code,selected.to.code,start,$('flights').checked,10);if(serial!==searchSerial)return;lastResults=results;
  const head=element('div','results-head');head.appendChild(element('h2',null,'Journeys from '+fmt(start)));head.appendChild(element('span','subtle',results.length+' results'));out.appendChild(head);out.appendChild(nav());
