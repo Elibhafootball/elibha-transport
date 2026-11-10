@@ -1,4 +1,4 @@
-import {JourneyEngine} from './journey-engine.js?v=20261110-6';
+import {JourneyEngine} from './journey-engine.js?v=20261110-8';
 let stations=[],engine=null,base=300,windowStart=300,history=[],lastResults=[],searchSerial=0;const selected={from:null,to:null};
 const $=id=>document.getElementById(id),norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const fmt=t=>String(Math.floor(t/60)%24).padStart(2,'0')+':'+String(t%60).padStart(2,'0')+(t>=1440?' +'+Math.floor(t/1440)+'d':'');
@@ -86,4 +86,15 @@ async function render(){const serial=++searchSerial;const out=$('results');out.r
  for(const r of results)out.appendChild(resultCard(r));out.appendChild(nav());$('status').textContent='Timetable search ready · '+( $('flights').checked?'Flights included':'Flights excluded');
 }
 async function init(){try{const [a,b,c]=await Promise.all(['./data/stations.json','./data/timetable.json','./data/config.json'].map(u=>fetch(u).then(r=>{if(!r.ok)throw Error(u+' could not be loaded');return r.json()})));stations=a;engine=new JourneyEngine(b,a,c);$('count').textContent=a.length+' locations · '+b.services.length+' scheduled services · '+b.transfers.length+' interchange connections';setup('from');setup('to');$('status').textContent='Ready to search the full Elibhan timetable.'}catch(e){$('status').textContent='Unable to load timetable: '+e.message;console.error(e)}}
-$('search').addEventListener('click',()=>{if(!selected.from||!selected.to){$('status').textContent='Select both stations from the suggestions.';return}if(selected.from.code===selected.to.code){$('status').textContent='Choose two different locations.';return}base=minutes($('time').value||'10:00');windowStart=base;history=[];render()});init();
+$('reverse').addEventListener('click',()=>{
+ const oldFrom=selected.from,oldTo=selected.to;
+ selected.from=oldTo;selected.to=oldFrom;
+ const fromValue=$('from').value,toValue=$('to').value;
+ $('from').value=toValue;$('to').value=fromValue;
+ $('from-list').hidden=true;$('to-list').hidden=true;
+ $('from').setAttribute('aria-expanded','false');$('to').setAttribute('aria-expanded','false');
+ if(selected.from&&selected.to&&selected.from.code!==selected.to.code){
+   base=minutes($('time').value||'05:00');windowStart=base;history=[];render();
+ }else{$('results').replaceChildren();$('status').textContent='Journey direction reversed. Select both stations to search.'}
+});
+$('search').addEventListener('click',()=>{if(!selected.from||!selected.to){$('status').textContent='Select both stations from the suggestions.';return}if(selected.from.code===selected.to.code){$('status').textContent='Choose two different locations.';return}base=minutes($('time').value||'05:00');windowStart=base;history=[];render()});init();
