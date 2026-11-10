@@ -1,13 +1,39 @@
-import {JourneyEngine} from './journey-engine.js?v=20261110-5';
-let stations=[],engine=null,base=600,windowStart=600,history=[],lastResults=[],searchSerial=0;const selected={from:null,to:null};
+import {JourneyEngine} from './journey-engine.js?v=20261110-6';
+let stations=[],engine=null,base=300,windowStart=300,history=[],lastResults=[],searchSerial=0;const selected={from:null,to:null};
 const $=id=>document.getElementById(id),norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const fmt=t=>String(Math.floor(t/60)%24).padStart(2,'0')+':'+String(t%60).padStart(2,'0')+(t>=1440?' +'+Math.floor(t/1440)+'d':'');
 const minutes=t=>{const [h,m]=t.split(':').map(Number);return h*60+m};
 function element(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
-function setup(which){const input=$(which),list=$(which+'-list');function close(){list.hidden=true;input.setAttribute('aria-expanded','false')}
- function show(){const q=norm(input.value.trim());selected[which]=null;list.replaceChildren();if(!q){close();return}const hits=stations.filter(s=>norm(s.name).startsWith(q)).concat(stations.filter(s=>!norm(s.name).startsWith(q)&&norm(s.name).includes(q))).slice(0,12);
- for(const s of hits){const b=element('button',null,s.name);b.type='button';const small=element('small',null,s.code);b.appendChild(small);b.addEventListener('click',()=>{input.value=s.name;selected[which]=s;close()});list.appendChild(b)}list.hidden=!hits.length;input.setAttribute('aria-expanded',String(!!hits.length))}
- input.addEventListener('input',show);input.addEventListener('focus',show);input.addEventListener('keydown',e=>{if(e.key==='Escape')close();if(e.key==='Enter'&&!list.hidden){e.preventDefault();list.querySelector('button')?.click()}});document.addEventListener('click',e=>{if(!input.parentElement.contains(e.target))close()})}
+function setup(which){
+ const input=$(which),list=$(which+'-list'),toggle=$(which+'-toggle');
+ let active=-1,hits=[];
+ function close(){list.hidden=true;input.setAttribute('aria-expanded','false');active=-1}
+ function choose(item){input.value=item.name;selected[which]=item;close()}
+ function show(forceAll=false){
+   const q=norm(input.value.trim());
+   selected[which]=null;active=-1;list.replaceChildren();
+   hits=forceAll||!q?stations:stations.filter(s=>norm(s.name).includes(q));
+   if(q&&!forceAll)hits.sort((a,b)=>Number(norm(b.name).startsWith(q))-Number(norm(a.name).startsWith(q))||a.name.localeCompare(b.name));
+   const visible=forceAll||!q?hits:hits.slice(0,35);
+   for(const item of visible){const b=element('button',null,item.name);b.type='button';b.setAttribute('role','option');const small=element('small',null,item.code);b.appendChild(small);b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>choose(item));list.appendChild(b)}
+   list.hidden=!visible.length;input.setAttribute('aria-expanded',String(!!visible.length));
+ }
+ input.addEventListener('input',()=>show(false));
+ input.addEventListener('focus',()=>show(!input.value.trim()));
+ toggle.addEventListener('click',()=>{if(!list.hidden){close()}else{input.focus();show(true)}});
+ input.addEventListener('keydown',e=>{
+   if(e.key==='Escape'){close();return}
+   const buttons=[...list.querySelectorAll('button')];
+   if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+     e.preventDefault();if(list.hidden)show(true);
+     const items=[...list.querySelectorAll('button')];
+     active=(active+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
+     items.forEach((b,i)=>b.classList.toggle('active',i===active));items[active]?.scrollIntoView({block:'nearest'});
+   }
+   if(e.key==='Enter'&&!list.hidden){e.preventDefault();(buttons[active>=0?active:0]||list.querySelector('button'))?.click()}
+ });
+ document.addEventListener('click',e=>{if(!input.parentElement.contains(e.target))close()});
+}
 function nav(){const div=element('div','nav');for(const [label,delta] of [['← Earlier',-1],['Later →',1]]){const b=element('button',null,label);b.disabled=delta<0&&history.length===0;b.addEventListener('click',()=>{if(delta<0){windowStart=history.pop()??base}else{history.push(windowStart);windowStart=lastResults.length?Math.max(windowStart+1,lastResults[lastResults.length-1].depart+1):windowStart+180}render()});div.appendChild(b)}return div}
 function showStops(step){const details=element('details');const summary=element('summary',null,'Show all stops and times');details.appendChild(summary);const ul=element('ul','stops');const dayOffset=Math.floor((step.depart-step.service.stops[step.fromIndex][1])/1440)*1440;for(const [code,time] of step.service.stops.slice(step.fromIndex,step.toIndex+1)){const li=element('li');li.appendChild(element('strong',null,fmt(time+dayOffset)));li.appendChild(element('span',null,engine.names.get(code)||code));ul.appendChild(li)}details.appendChild(ul);return details}
 const modeIcon={train:'🚆',metro:'🚇',ferry:'⛴️',flight:'✈️'};
