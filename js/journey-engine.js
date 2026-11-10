@@ -3,7 +3,7 @@ export class JourneyEngine {
   constructor(data, stations, config) {
     this.services=data.services;this.stations=stations;this.config=config;
     this.names=new Map(stations.map(s=>[s.code,s.name]));
-    this.byStation=new Map();this.walk=new Map();this.departures=new Map();
+    this.byStation=new Map();this.walk=new Map();this.departures=new Map();this.routeCache=new Map();
     for(const [a,b,t] of data.transfers){if(!this.walk.has(a))this.walk.set(a,[]);this.walk.get(a).push({to:b,time:t})}
     // Index one boarding event per train/flight/ferry stop, rather than every
     // possible origin-destination pair (which was nearly 900,000 edges).
@@ -34,6 +34,8 @@ export class JourneyEngine {
   }
   // Earliest-arrival, bounded-transfer time-dependent label search.
   route(from,to,earliest,includeFlights,maxLegs=8){
+    const cacheKey=from+'|'+to+'|'+earliest+'|'+includeFlights+'|'+maxLegs;
+    if(this.routeCache.has(cacheKey))return this.routeCache.get(cacheKey);
     const labels=new Map(),queue=[];let seq=0;
     const push=x=>{queue.push(x);let i=queue.length-1;while(i){let p=(i-1)>>1;if(queue[p].time<=x.time)break;queue[i]=queue[p];i=p}queue[i]=x};
     const pop=()=>{const out=queue[0],last=queue.pop();if(queue.length){let i=0;while(i*2+1<queue.length){let c=i*2+1;if(c+1<queue.length&&queue[c+1].time<queue[c].time)c++;if(last.time<=queue[c].time)break;queue[i]=queue[c];i=c}queue[i]=last}return out};
@@ -77,7 +79,10 @@ export class JourneyEngine {
         }
       }}
     }
-    return best?{depart:best.first??earliest,arrive:best.time,steps:best.path,rides:best.legs}:null;
+    const result=best?{depart:best.first??earliest,arrive:best.time,steps:best.path,rides:best.legs}:null;
+    if(this.routeCache.size>=300)this.routeCache.clear();
+    this.routeCache.set(cacheKey,result);
+    return result;
   }
   journeys(from,to,start,includeFlights=false,limit=10){
     const seeds=new Set([start]);const frontier=[{code:from,time:0}];const seen=new Set([from]);
