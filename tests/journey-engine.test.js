@@ -40,3 +40,28 @@ test('overnight trains preserve chronological time',()=>{
  const r=e.route('AAA','CCC',1420,false);
  assert.equal(r.arrive,1460);
 });
+
+test('flight at exactly sixty minutes after train arrival is permitted',()=>{
+ const e=new JourneyEngine({services:[
+ {id:'r',code:'R',mode:'train',name:'rail',stops:[['AAA',600],['APT',620]]},
+ {id:'f',code:'E',mode:'flight',name:'flight',stops:[['AIR',680],['CCC',700]]}
+ ],transfers:[['APT','AIR',45]]},stations,config);
+ const r=e.route('AAA','CCC',600,true);
+ assert.ok(r);
+ assert.equal(r.arrive,700);
+ assert.equal(r.rides,2);
+});
+test('same-time arrival favours fewer changes',()=>{
+ const e=new JourneyEngine({services:[
+ {id:'one',code:'D',mode:'train',name:'direct',stops:[['AAA',600],['CCC',700]]},
+ {id:'part1',code:'P',mode:'train',name:'part1',stops:[['AAA',600],['BBB',650]]},
+ {id:'part2',code:'Q',mode:'train',name:'part2',stops:[['BBB',652],['CCC',700]]}
+ ],transfers:[]},stations,config);
+ const r=e.route('AAA','CCC',600,false);
+ assert.equal(r.rides,1);
+});
+test('boarding index stores one event per service stop',()=>{
+ const e=new JourneyEngine({services:[{id:'multi',code:'M',mode:'train',name:'multi',stops:[['AAA',600],['BBB',620],['CCC',640]]}],transfers:[]},stations,config);
+ assert.equal([...e.byStation.values()].reduce((n,events)=>n+events.length,0),2);
+ assert.equal(e.route('AAA','CCC',600,false).arrive,640);
+});
