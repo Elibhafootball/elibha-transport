@@ -23,14 +23,14 @@ export class JourneyEngine {
   airport(code){return (this.names.get(code)||'').includes('International Airport')}
   walkTime(from,to,minutes,lastMode) {
     // Rail-to-flight / flight-to-rail airport interchange allowances are all-inclusive.
-    if(this.airport(to)&&lastMode!=='flight'&&lastMode!=='start')return 60;
+    if(this.airport(to)&&lastMode==='train')return 60;
     if(this.airport(from)&&lastMode==='flight')return 30;
     return Math.max(2,minutes);
   }
   connectionTime(lastMode,nextMode,changed) {
     if(!changed)return 0;
-    if(nextMode==='flight'&&lastMode!=='flight'&&lastMode!=='start')return 60;
-    if(lastMode==='flight'&&nextMode!=='flight')return 30;
+    if(nextMode==='flight'&&lastMode==='train')return 60;
+    if(lastMode==='flight'&&nextMode==='train')return 30;
     return 2;
   }
   // Earliest-arrival, bounded-transfer time-dependent label search.
@@ -74,13 +74,13 @@ export class JourneyEngine {
     for(const code of seen)for(const d of this.departures.get(code)||[])for(let day=0;day<=2;day++){const at=d+day*1440;if(at>=start&&at<start+900)seeds.add(at)}
     const ordered=[...seeds].sort((a,b)=>a-b);const results=[],keys=new Set();
     // Group near-identical results by the actual boarded services and arrival.
-    for(const seed of ordered.slice(0,160)){
+    for(const seed of ordered.slice(0,55)){
       const r=this.route(from,to,seed,includeFlights);
       if(!r)continue;
       const signature=r.steps.filter(s=>s.type==='ride').map(s=>s.service.id).join('|');
       if(keys.has(signature))continue;
       keys.add(signature);results.push(r);
-      if(results.length>=limit*3)break;
+      if(results.length>=limit*2)break;
     }
     // Also preserve direct rides, even when a connecting route is faster.
     for(const s of this.services){
