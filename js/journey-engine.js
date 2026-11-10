@@ -86,13 +86,13 @@ export class JourneyEngine {
     for(const code of seen)for(const d of this.departures.get(code)||[])for(let day=0;day<=2;day++){const at=d+day*1440;if(at>=start&&at<start+900)seeds.add(at)}
     const ordered=[...seeds].sort((a,b)=>a-b);const results=[],keys=new Set();
     // Group near-identical results by the actual boarded services and arrival.
-    for(const seed of ordered.filter((t,i,a)=>i===0||t-a[i-1]>=5).slice(0,40)){
+    for(const seed of ordered.filter((t,i,a)=>i===0||t-a[i-1]>=5).slice(0,10)){
       const r=this.route(from,to,seed,includeFlights);
       if(!r)continue;
       const signature=r.steps.filter(s=>s.type==='ride').map(s=>s.service.id).join('|');
       if(keys.has(signature))continue;
       keys.add(signature);results.push(r);
-      if(results.length>=limit*3)break;
+      if(results.length>=limit*2)break;
     }
     // Also preserve direct rides, even when a connecting route is faster.
     for(const s of this.services){
