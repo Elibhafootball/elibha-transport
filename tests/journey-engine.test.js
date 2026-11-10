@@ -65,3 +65,24 @@ test('boarding index stores one event per service stop',()=>{
  assert.equal([...e.byStation.values()].reduce((n,events)=>n+events.length,0),2);
  assert.equal(e.route('AAA','CCC',600,false).arrive,640);
 });
+
+test('later departure with same arrival and changes removes earlier alternatives',()=>{
+ const e=new JourneyEngine({services:[
+ {id:'a',code:'A',mode:'train',name:'early',stops:[['AAA',413],['CCC',1020]]},
+ {id:'b',code:'B',mode:'train',name:'middle',stops:[['AAA',467],['CCC',1020]]},
+ {id:'c',code:'C',mode:'train',name:'late',stops:[['AAA',527],['CCC',1020]]}
+ ],transfers:[]},stations,config);
+ const results=e.journeys('AAA','CCC',400,false,10);
+ assert.equal(results.length,1);
+ assert.equal(results[0].depart,527);
+});
+test('slower direct journey remains when faster option requires changing',()=>{
+ const e=new JourneyEngine({services:[
+ {id:'direct',code:'D',mode:'train',name:'direct',stops:[['AAA',600],['CCC',700]]},
+ {id:'leg1',code:'L1',mode:'train',name:'leg1',stops:[['AAA',605],['BBB',620]]},
+ {id:'leg2',code:'L2',mode:'train',name:'leg2',stops:[['BBB',622],['CCC',650]]}
+ ],transfers:[]},stations,config);
+ const results=e.journeys('AAA','CCC',600,false,10);
+ assert.ok(results.some(r=>r.rides===1&&r.arrive===700));
+ assert.ok(results.some(r=>r.rides===2&&r.arrive===650));
+});
