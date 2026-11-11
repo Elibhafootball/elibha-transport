@@ -85,7 +85,28 @@ async function render(){const serial=++searchSerial;const out=$('results');out.r
  if(!results.length)out.appendChild(element('p',null,'No journeys found in this time window. Try Later, or include flights.'));
  for(const r of results)out.appendChild(resultCard(r));out.appendChild(nav());$('status').textContent='Timetable search ready · '+( $('flights').checked?'Flights included':'Flights excluded');
 }
-async function init(){try{const [a,b,c]=await Promise.all(['./data/stations.json','./data/timetable.json','./data/config.json'].map(u=>fetch(u).then(r=>{if(!r.ok)throw Error(u+' could not be loaded');return r.json()})));stations=a;engine=new JourneyEngine(b,a,c);$('count').textContent=a.length+' locations · '+b.services.length+' scheduled services · '+b.transfers.length+' interchange connections';setup('from');setup('to');$('status').textContent='Ready to search the full Elibhan timetable.'}catch(e){$('status').textContent='Unable to load timetable: '+e.message;console.error(e)}}
+// Source correction, 11 Nov 2026: Bay Line westbound Critchley branch (BM4).
+// The corrected sheet has Tobacco Dock 24 minutes after Critchley on all 118 runs.
+// Restore the missing/misparsed stop without modifying unrelated services.
+function repairCritchleyTobaccoDock(data){
+ let corrected=0;
+ for(const service of data.services){
+  if(service.code!=='BM4'||!service.name?.includes('Critchley Branch'))continue;
+  const first=service.stops.find(x=>x[0]==='CIH');
+  // Match by first stop, falling back to the first recorded stop if necessary.
+  const origin=first||service.stops[0];
+  if(!origin)continue;
+  const target=origin[1]+24;
+  const existing=service.stops.findIndex(x=>x[0]==='TBD');
+  if(existing>=0){if(service.stops[existing][1]!==target){service.stops[existing][1]=target;corrected++}}
+  else{const before=service.stops.findIndex(x=>x[0]==='BRP');
+   const after=service.stops.findIndex(x=>x[0]==='STI');
+   if(before>=0&&after===before+1){service.stops.splice(after,0,['TBD',target]);corrected++}
+  }
+ }
+ return corrected;
+}
+async function init(){try{const [a,b,c]=await Promise.all(['./data/stations.json','./data/timetable.json','./data/config.json'].map(u=>fetch(u).then(r=>{if(!r.ok)throw Error(u+' could not be loaded');return r.json()})));stations=a;const corrected=repairCritchleyTobaccoDock(b);engine=new JourneyEngine(b,a,c);$('count').textContent=a.length+' locations · '+b.services.length+' scheduled services · '+b.transfers.length+' interchange connections';setup('from');setup('to');$('status').textContent='Ready to search the full Elibhan timetable.'}catch(e){$('status').textContent='Unable to load timetable: '+e.message;console.error(e)}}
 $('reverse').addEventListener('click',()=>{
  const oldFrom=selected.from,oldTo=selected.to;
  selected.from=oldTo;selected.to=oldFrom;
