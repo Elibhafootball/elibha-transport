@@ -106,7 +106,25 @@ function repairCritchleyTobaccoDock(data){
  }
  return corrected;
 }
-async function init(){try{const [a,b,c]=await Promise.all(['./data/stations.json','./data/timetable.json','./data/config.json'].map(u=>fetch(u).then(r=>{if(!r.ok)throw Error(u+' could not be loaded');return r.json()})));stations=a;const corrected=repairCritchleyTobaccoDock(b);engine=new JourneyEngine(b,a,c);$('count').textContent=a.length+' locations · '+b.services.length+' scheduled services · '+b.transfers.length+' interchange connections';setup('from');setup('to');$('status').textContent='Ready to search the full Elibhan timetable.'}catch(e){$('status').textContent='Unable to load timetable: '+e.message;console.error(e)}}
+// BM6 timetable refreshed from the 11 November 2026 source sheet.
+// The sheet's Strachan Island column has 118 inconsistent formula values;
+// use its first valid service and the consistent neighbouring stops instead.
+function refreshBM6(data){
+ const codes=["LSJ","WLG","WGS","SHW","WAD","TRN","WER","ECC","CAS","RIC","EDS","WDK","RFQ","BRP","TBD","STR","EXC","SOT","WAI","EFL","TBB","VLB","HTV","CLI","FLP"];
+ const offsets=[0,3,5,7,9,11,13,15,16,18,20,22,24,26,27,28,30,31,33,34,35,37,39,41,43];
+ let updated=0;
+ for(const service of data.services){
+  if(service.code!=='BM6'||!service.name?.includes('Longford St James'))continue;
+  const first=service.stops.find(x=>x[0]==='LSJ');
+  if(!first)continue;
+  const revised=codes.map((code,i)=>[code,first[1]+offsets[i]]);
+  if(JSON.stringify(service.stops)!==JSON.stringify(revised)){
+   service.stops=revised;updated++;
+  }
+ }
+ return updated;
+}
+async function init(){try{const [a,b,c]=await Promise.all(['./data/stations.json','./data/timetable.json','./data/config.json'].map(u=>fetch(u).then(r=>{if(!r.ok)throw Error(u+' could not be loaded');return r.json()})));stations=a;const corrected=repairCritchleyTobaccoDock(b);const bm6Updated=refreshBM6(b);engine=new JourneyEngine(b,a,c);$('count').textContent=a.length+' locations · '+b.services.length+' scheduled services · '+b.transfers.length+' interchange connections';setup('from');setup('to');$('status').textContent='Ready to search the full Elibhan timetable.'}catch(e){$('status').textContent='Unable to load timetable: '+e.message;console.error(e)}}
 $('reverse').addEventListener('click',()=>{
  const oldFrom=selected.from,oldTo=selected.to;
  selected.from=oldTo;selected.to=oldFrom;
