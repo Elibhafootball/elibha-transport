@@ -124,7 +124,23 @@ function refreshBM6(data){
  }
  return updated;
 }
-async function init(){try{const [a,b,c]=await Promise.all(['./data/stations.json','./data/timetable.json','./data/config.json'].map(u=>fetch(u).then(r=>{if(!r.ok)throw Error(u+' could not be loaded');return r.json()})));stations=a;const corrected=repairCritchleyTobaccoDock(b);const bm6Updated=refreshBM6(b);engine=new JourneyEngine(b,a,c);$('count').textContent=a.length+' locations · '+b.services.length+' scheduled services · '+b.transfers.length+' interchange connections';setup('from');setup('to');$('status').textContent='Ready to search the full Elibhan timetable.'}catch(e){$('status').textContent='Unable to load timetable: '+e.message;console.error(e)}}
+// Refresh all BM5 departures using the corrected 11 Nov 2026 Google Sheet.
+function refreshBM5(data){
+ const codes=["FLP","CLI","HTV","VLB","TBB","EFL","WAI","SOT","EXC","STR","TBD","BRP","RFQ","WDK","EDS","RIC","CAS","ECC","WER","TRN","WAD","SHW","WGS","WLG","LSJ"];
+ const offsets=[0,2,4,6,8,9,10,12,13,15,16,17,19,21,23,25,27,28,30,32,34,36,38,40,43];
+ let updated=0;
+ for(const service of data.services){
+  if(service.code!=='BM5'||!service.name?.includes('Longford St James'))continue;
+  const first=service.stops.find(x=>x[0]==='FLP');
+  if(!first)continue;
+  const revised=codes.map((code,i)=>[code,first[1]+offsets[i]]);
+  if(JSON.stringify(service.stops)!==JSON.stringify(revised)){
+   service.stops=revised;updated++;
+  }
+ }
+ return updated;
+}
+async function init(){try{const [a,b,c]=await Promise.all(['./data/stations.json','./data/timetable.json','./data/config.json'].map(u=>fetch(u).then(r=>{if(!r.ok)throw Error(u+' could not be loaded');return r.json()})));stations=a;const corrected=repairCritchleyTobaccoDock(b);const bm6Updated=refreshBM6(b);const bm5Updated=refreshBM5(b);engine=new JourneyEngine(b,a,c);$('count').textContent=a.length+' locations · '+b.services.length+' scheduled services · '+b.transfers.length+' interchange connections';setup('from');setup('to');$('status').textContent='Ready to search the full Elibhan timetable.'}catch(e){$('status').textContent='Unable to load timetable: '+e.message;console.error(e)}}
 $('reverse').addEventListener('click',()=>{
  const oldFrom=selected.from,oldTo=selected.to;
  selected.from=oldTo;selected.to=oldFrom;
