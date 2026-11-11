@@ -92,7 +92,7 @@ function repairCritchleyTobaccoDock(data){
  let corrected=0;
  for(const service of data.services){
   if(service.code!=='BM4'||!service.name?.includes('Critchley Branch'))continue;
-  const first=service.stops.find(x=>x[0]==='CIH');
+  const first=service.stops.find(x=>x[0]==='CRI');
   // Match by first stop, falling back to the first recorded stop if necessary.
   const origin=first||service.stops[0];
   if(!origin)continue;
@@ -100,7 +100,7 @@ function repairCritchleyTobaccoDock(data){
   const existing=service.stops.findIndex(x=>x[0]==='TBD');
   if(existing>=0){if(service.stops[existing][1]!==target){service.stops[existing][1]=target;corrected++}}
   else{const before=service.stops.findIndex(x=>x[0]==='BRP');
-   const after=service.stops.findIndex(x=>x[0]==='STI');
+   const after=service.stops.findIndex(x=>x[0]==='STR');
    if(before>=0&&after===before+1){service.stops.splice(after,0,['TBD',target]);corrected++}
   }
  }
